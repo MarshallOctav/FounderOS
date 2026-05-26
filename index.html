@@ -1,13 +1,99 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="canonical" href="http://founderos.optibis.io/" />
+    <link rel="image_src" href="http://founderos.optibis.io/preview.jpg" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="application-name" content="FounderOS" />
+    <meta name="apple-mobile-web-app-title" content="FounderOS" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="author" content="FounderOS" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta
+      name="description"
+      content="FounderOS adalah SaaS toolkit gratis untuk founder: kelola company, project, CRM, finance, AI Advisor, dashboard demo, dark mode, dan data lokal dalam satu workspace."
+    />
+    <meta
+      name="keywords"
+      content="FounderOS, founder tools, SaaS gratis, dashboard founder, CRM gratis, project management, finance dashboard, AI advisor, business operating system, startup tools Indonesia"
+    />
+
+    <meta property="og:locale" content="id_ID" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FounderOS" />
+    <meta property="og:url" content="http://founderos.optibis.io/" />
+    <meta property="og:updated_time" content="2026-05-26T00:00:00+07:00" />
+    <meta property="og:title" content="FounderOS - Free SaaS Toolkit untuk Founder" />
+    <meta
+      property="og:description"
+      content="Rapikan company, project, CRM, finance, dan AI Advisor dalam satu dashboard founder yang gratis dicoba."
+    />
+    <meta property="og:image" content="http://founderos.optibis.io/preview.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1507" />
+    <meta property="og:image:height" content="888" />
+    <meta property="og:image:alt" content="Preview landing page FounderOS SaaS toolkit untuk founder" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="http://founderos.optibis.io/" />
+    <meta name="twitter:title" content="FounderOS - Free SaaS Toolkit untuk Founder" />
+    <meta
+      name="twitter:description"
+      content="Dashboard founder gratis untuk company, project, CRM, finance, dan AI Advisor."
+    />
+    <meta name="twitter:image" content="http://founderos.optibis.io/preview.jpg" />
+    <meta name="twitter:image:alt" content="Preview FounderOS dashboard dan landing page" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "FounderOS",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "url": "http://founderos.optibis.io/",
+        "image": "http://founderos.optibis.io/preview.jpg",
+        "description": "FounderOS adalah SaaS toolkit gratis untuk founder yang menyatukan company, project, CRM, finance, dan AI Advisor dalam satu workspace.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "IDR",
+          "availability": "https://schema.org/InStock"
+        },
+        "featureList": [
+          "Company management",
+          "Project management",
+          "CRM pipeline",
+          "Finance dashboard",
+          "AI Advisor",
+          "Dark mode",
+          "Local storage demo"
+        ]
+      }
+    </script>
+    <title>FounderOS - Free SaaS Toolkit untuk Founder</title>
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem('founderos:theme:v1');
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (theme === 'dark' || (!theme && prefersDark)) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.dataset.theme = 'dark';
+          } else {
+            document.documentElement.dataset.theme = 'light';
+          }
+        } catch (error) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Building2, Plus, ArrowRight, Trash2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Link } from 'react-router-dom';
+import { createId, getCompanyProjectCount, readFounderData, updateFounderData } from '@/lib/localStore';
 
 interface Company {
   id: string;
@@ -25,59 +27,53 @@ export default function Companies() {
   const fetchCompanies = () => {
     setLoading(true);
     setError(null);
-    fetch('/api/companies')
-      .then(async res => {
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || `HTTP error ${res.status}`);
-        }
-        return res.json();
-      })
-      .then(data => {
-        setCompanies(data);
-        setError(null);
-      })
-      .catch(err => {
-        console.error(err);
-        setError(err.message || 'Gagal memuat data dari server');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    try {
+      const storedData = readFounderData();
+      setCompanies(storedData.companies.map((company) => ({
+        ...company,
+        project_count: getCompanyProjectCount(storedData, company.id),
+      })));
+      setError(null);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Gagal memuat data lokal');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCreate = async () => {
+  const handleCreate = () => {
     if (!newCompany.name) return;
 
-    try {
-      const res = await fetch('/api/companies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCompany)
-      });
-      
-      if (res.ok) {
-        const created = await res.json();
-        setCompanies([...companies, created]);
-        setIsModalOpen(false);
-        setNewCompany({ name: '', type: 'subsidiary', industry: '' });
-      }
-    } catch (error) {
-      console.error("Failed to create company", error);
-    }
+    const created = {
+      id: createId('company'),
+      ...newCompany,
+      project_count: 0,
+    };
+    updateFounderData((data) => ({
+      ...data,
+      companies: [...data.companies, { id: created.id, name: created.name, type: created.type, industry: created.industry }],
+    }));
+    setCompanies([...companies, created]);
+    setIsModalOpen(false);
+    setNewCompany({ name: '', type: 'subsidiary', industry: '' });
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm('Are you sure you want to delete this company?')) return;
-    
-    try {
-      const res = await fetch(`/api/companies/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setCompanies(companies.filter(c => c.id !== id));
-      }
-    } catch (error) {
-      console.error("Failed to delete company", error);
-    }
+
+    updateFounderData((data) => {
+      const deletedProjectIds = data.projects.filter((project) => project.company_id === id).map((project) => project.id);
+      return {
+        ...data,
+        companies: data.companies.filter((company) => company.id !== id),
+        projects: data.projects.filter((project) => project.company_id !== id),
+        tasks: data.tasks.filter((task) => !deletedProjectIds.includes(task.project_id)),
+        contacts: data.contacts.filter((contact) => contact.company_id !== id),
+        transactions: data.transactions.filter((transaction) => transaction.company_id !== id),
+      };
+    });
+    setCompanies(companies.filter(c => c.id !== id));
   };
 
   if (loading) return (
@@ -108,29 +104,29 @@ export default function Companies() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto relative">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Holding Structure</h1>
-          <p className="text-slate-500 mt-1">Manage your portfolio of companies and business units.</p>
+    <div className="relative mx-auto max-w-7xl">
+      <div className="mb-5 flex items-start justify-between gap-3 md:mb-8 md:items-center">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Holding Structure</h1>
+          <p className="text-wrap-safe mt-1 text-sm text-slate-500 md:text-base">Manage your portfolio of companies and business units.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2"
+          className="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-700 md:gap-2 md:px-4 md:text-base"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Entity</span>
+          <span>Add</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="mobile-odd-span grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
         {companies.map((company, index) => (
           <motion.div
             key={company.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group relative"
+            className="group relative rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md md:p-6"
           >
             <button 
               onClick={() => handleDelete(company.id)}
@@ -140,10 +136,10 @@ export default function Companies() {
             </button>
 
             <div className="flex items-start justify-between mb-4">
-              <div className="p-3 bg-indigo-50 rounded-lg">
-                <Building2 className="w-6 h-6 text-indigo-600" />
+              <div className="rounded-lg bg-indigo-50 p-2 md:p-3">
+                <Building2 className="h-5 w-5 text-indigo-600 md:h-6 md:w-6" />
               </div>
-              <span className={`text-xs font-medium px-2 py-1 rounded-full capitalize ${
+              <span className={`rounded-full px-2 py-1 text-[10px] font-medium capitalize md:text-xs ${
                 company.type === 'holding' ? 'bg-purple-100 text-purple-700' : 
                 company.type === 'subsidiary' ? 'bg-blue-100 text-blue-700' : 
                 'bg-slate-100 text-slate-700'
@@ -152,27 +148,27 @@ export default function Companies() {
               </span>
             </div>
             
-            <h3 className="text-lg font-bold text-slate-900 mb-1">{company.name}</h3>
-            <p className="text-sm text-slate-500 mb-4">{company.industry || 'General Industry'}</p>
+            <h3 className="text-wrap-safe mb-1 text-sm font-bold text-slate-900 md:text-lg">{company.name}</h3>
+            <p className="text-wrap-safe mb-3 text-xs text-slate-500 md:mb-4 md:text-sm">{company.industry || 'General Industry'}</p>
             
-            <div className="grid grid-cols-2 gap-4 py-4 border-t border-slate-100">
+            <div className="grid grid-cols-2 gap-2 border-t border-slate-100 py-3 md:gap-4 md:py-4">
               <div>
-                <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Projects</p>
-                <p className="text-lg font-semibold text-slate-900 flex items-center gap-1">
+                <p className="text-[10px] font-medium uppercase text-slate-400 md:text-xs">Projects</p>
+                <p className="flex items-center gap-1 text-base font-semibold text-slate-900 md:text-lg">
                   {company.project_count}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Health</p>
-                <p className="text-lg font-semibold text-emerald-600 flex items-center gap-1">
+                <p className="text-[10px] font-medium uppercase text-slate-400 md:text-xs">Health</p>
+                <p className="flex items-center gap-1 text-base font-semibold text-emerald-600 md:text-lg">
                   98%
                 </p>
               </div>
             </div>
 
-            <button className="w-full mt-2 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center justify-center gap-1">
-              View Dashboard <ArrowRight className="w-4 h-4" />
-            </button>
+            <Link to="/dashboard/projects" className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-2 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50 md:text-sm">
+              View <ArrowRight className="h-4 w-4" />
+            </Link>
           </motion.div>
         ))}
       </div>

@@ -1,53 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   LayoutDashboard, 
   Briefcase, 
   Users, 
-  PieChart, 
   Settings, 
   Bot, 
   Building2, 
   Menu,
   X,
-  Plus,
-  ArrowRight,
-  CheckCircle2,
-  DollarSign,
-  TrendingUp
+  LogOut,
+  DollarSign
 } from 'lucide-react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { motion } from 'motion/react';
+import { clearSession, readSession, type FounderSession } from '@/lib/localStore';
+import BrandLogo from './BrandLogo';
+import DarkModeToggle from './DarkModeToggle';
 
 export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [session, setSession] = useState<FounderSession | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: Building2, label: 'Companies', path: '/companies' },
-    { icon: Briefcase, label: 'Projects', path: '/projects' },
-    { icon: Users, label: 'CRM', path: '/crm' },
-    { icon: DollarSign, label: 'Finance', path: '/finance' },
-    { icon: Bot, label: 'AI Advisor', path: '/ai' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+    { icon: Building2, label: 'Companies', path: '/dashboard/companies' },
+    { icon: Briefcase, label: 'Projects', path: '/dashboard/projects' },
+    { icon: Users, label: 'CRM', path: '/dashboard/crm' },
+    { icon: DollarSign, label: 'Finance', path: '/dashboard/finance' },
+    { icon: Bot, label: 'AI Advisor', path: '/dashboard/ai' },
+    { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
   ];
 
+  useEffect(() => {
+    const syncSession = () => {
+      const storedSession = readSession();
+      if (!storedSession) {
+        navigate('/auth', { replace: true });
+        return;
+      }
+      setSession(storedSession);
+    };
+
+    syncSession();
+    window.addEventListener('founderos:session-updated', syncSession);
+    return () => window.removeEventListener('founderos:session-updated', syncSession);
+  }, [navigate]);
+
+  const handleLogout = () => {
+    clearSession();
+    navigate('/auth', { replace: true });
+  };
+
+  const initials = (session?.name || session?.email || 'DF')
+    .split(/\s|@/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
+    <div className="flex h-dvh bg-slate-50 text-slate-900 font-sans">
       {/* Sidebar */}
       <motion.aside 
         initial={false}
         animate={{ width: isSidebarOpen ? 256 : 80 }}
-        className="bg-slate-900 text-white flex-shrink-0 flex flex-col border-r border-slate-800 relative z-20"
+        className="relative z-20 hidden flex-shrink-0 flex-col border-r border-slate-800 bg-slate-900 text-white md:flex"
       >
         <div className="h-16 flex items-center px-6 border-b border-slate-800">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center flex-shrink-0">
-              <TrendingUp className="w-5 h-5 text-white" />
-            </div>
+            <BrandLogo className="h-8 w-8 flex-shrink-0" />
             {isSidebarOpen && (
-              <span className="font-bold text-lg tracking-tight whitespace-nowrap">FounderOS</span>
+              <span className="font-bold text-lg whitespace-nowrap">FounderOS</span>
             )}
           </div>
         </div>
@@ -87,21 +113,54 @@ export default function Layout() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
-          <h1 className="text-xl font-semibold text-slate-800">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8">
+          <h1 className="text-lg font-semibold text-slate-800 md:text-xl">
             {navItems.find(i => i.path === location.pathname)?.label || 'Overview'}
           </h1>
           <div className="flex items-center gap-4">
-            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-medium text-sm">
-              DF
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-semibold text-slate-800">{session?.name || 'Demo Founder'}</p>
+              <p className="text-xs text-slate-500">{session?.email || 'founder@founderos.local'}</p>
             </div>
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-medium text-sm flex-shrink-0">
+              {initials || 'DF'}
+            </div>
+            <DarkModeToggle />
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-rose-600"
+              aria-label="Logout"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 pb-24 md:p-8">
           <Outlet />
         </div>
       </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t border-slate-200 bg-white px-1 py-2 shadow-lg md:hidden">
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[9px] font-semibold transition-colors",
+                isActive ? "bg-indigo-50 text-indigo-700" : "text-slate-500"
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              <span className="max-w-full truncate">{item.label.replace('Dashboard', 'Home').replace('Companies', 'Co.')}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

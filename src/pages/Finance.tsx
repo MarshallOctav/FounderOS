@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
-  DollarSign, 
   TrendingUp, 
   TrendingDown, 
   Download, 
-  Calendar,
-  CreditCard
+  CreditCard,
+  Plus,
+  X
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { createId, getCompanyName, readFounderData, updateFounderData, type Company } from '@/lib/localStore';
 
 interface Transaction {
   id: string;
@@ -21,31 +22,90 @@ interface Transaction {
 
 export default function Finance() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newTransaction, setNewTransaction] = useState({
+    description: '',
+    amount: '',
+    type: 'income',
+    category: '',
+    date: new Date().toISOString().slice(0, 10),
+    company_id: '',
+  });
+
+  const hydrateFinance = () => {
+    const storedData = readFounderData();
+    setCompanies(storedData.companies);
+    setTransactions([...storedData.transactions]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .map((transaction) => ({
+        ...transaction,
+        company_name: getCompanyName(storedData, transaction.company_id),
+      })));
+    setNewTransaction((current) => ({
+      ...current,
+      company_id: current.company_id || storedData.companies[0]?.id || '',
+    }));
+  };
 
   const fetchFinance = () => {
     setLoading(true);
     setError(null);
-    fetch('/api/finance')
-      .then(async res => {
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || `HTTP error ${res.status}`);
-        }
-        return res.json();
-      })
-      .then(data => {
-        setTransactions(data);
-        setError(null);
-      })
-      .catch(err => {
-        console.error(err);
-        setError(err.message || 'Gagal memuat keuangan dari server');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    try {
+      hydrateFinance();
+      setError(null);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Gagal memuat keuangan lokal');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    if (!newTransaction.description.trim() || !newTransaction.company_id) return;
+
+    updateFounderData((data) => ({
+      ...data,
+      transactions: [
+        ...data.transactions,
+        {
+          id: createId('tx'),
+          company_id: newTransaction.company_id,
+          description: newTransaction.description.trim(),
+          amount: Number(newTransaction.amount) || 0,
+          type: newTransaction.type as 'income' | 'expense',
+          category: newTransaction.category.trim() || 'General',
+          date: newTransaction.date,
+        },
+      ],
+    }));
+    hydrateFinance();
+    setNewTransaction({
+      description: '',
+      amount: '',
+      type: 'income',
+      category: '',
+      date: new Date().toISOString().slice(0, 10),
+      company_id: companies[0]?.id || '',
+    });
+    setIsModalOpen(false);
+  };
+
+  const handleExport = () => {
+    const header = ['Date', 'Company', 'Description', 'Category', 'Type', 'Amount'];
+    const rows = transactions.map((tx) => [tx.date, tx.company_name, tx.description, tx.category, tx.type, String(tx.amount)]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'founderos-finance-report.csv';
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -135,51 +195,57 @@ export default function Finance() {
   const chartData = generateForecast(baseChartData);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Finance</h1>
-          <p className="text-slate-500 mt-1">Cashflow, P&L, and expense management.</p>
+    <div className="mx-auto max-w-7xl space-y-5 md:space-y-8">
+      <div className="flex items-start justify-between gap-3 md:items-center">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Finance</h1>
+          <p className="text-wrap-safe mt-1 text-sm text-slate-500 md:text-base">Cashflow, P&L, and expense management.</p>
         </div>
-        <button className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 flex items-center gap-2 font-medium">
-          <Download className="w-4 h-4" />
-          Export Report
-        </button>
+        <div className="flex flex-shrink-0 items-center gap-2 md:gap-3">
+          <button onClick={handleExport} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 md:gap-2 md:px-4 md:text-base">
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-700 md:gap-2 md:px-4 md:text-base">
+            <Plus className="w-4 h-4" />
+            Add
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-sm font-medium text-slate-500 mb-1">Total Revenue</p>
+      <div className="mobile-odd-span grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-6">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+          <p className="mb-1 text-xs font-medium text-slate-500 md:text-sm">Total Revenue</p>
           <div className="flex items-baseline gap-2">
-            <h3 className="text-2xl font-bold text-slate-900">${totalIncome.toLocaleString()}</h3>
+            <h3 className="text-xl font-bold text-slate-900 md:text-2xl">${totalIncome.toLocaleString()}</h3>
             <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center">
               <TrendingUp className="w-3 h-3 mr-1" /> +8.2%
             </span>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-sm font-medium text-slate-500 mb-1">Total Expenses</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+          <p className="mb-1 text-xs font-medium text-slate-500 md:text-sm">Total Expenses</p>
           <div className="flex items-baseline gap-2">
-            <h3 className="text-2xl font-bold text-slate-900">${totalExpenses.toLocaleString()}</h3>
+            <h3 className="text-xl font-bold text-slate-900 md:text-2xl">${totalExpenses.toLocaleString()}</h3>
             <span className="text-xs font-medium text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded flex items-center">
               <TrendingDown className="w-3 h-3 mr-1" /> +12%
             </span>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-sm font-medium text-slate-500 mb-1">Net Profit</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+          <p className="mb-1 text-xs font-medium text-slate-500 md:text-sm">Net Profit</p>
           <div className="flex items-baseline gap-2">
-            <h3 className={`text-2xl font-bold ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            <h3 className={`text-xl font-bold md:text-2xl ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
               ${netProfit.toLocaleString()}
             </h3>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 lg:gap-8">
         {/* Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
             <h3 className="text-lg font-semibold text-slate-900">Cashflow & Forecast</h3>
             <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-500">
@@ -232,7 +298,7 @@ export default function Finance() {
         </div>
 
         {/* Recent Transactions */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-6">Recent Transactions</h3>
           <div className="space-y-4">
             {transactions.map((tx) => (
@@ -260,6 +326,40 @@ export default function Finance() {
           </div>
         </div>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 p-4">
+              <h3 className="font-semibold text-slate-900">Add Transaction</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 p-6">
+              <input value={newTransaction.description} onChange={(event) => setNewTransaction({ ...newTransaction, description: event.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Description" />
+              <div className="grid grid-cols-2 gap-3">
+                <input value={newTransaction.amount} onChange={(event) => setNewTransaction({ ...newTransaction, amount: event.target.value })} type="number" className="rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Amount" />
+                <select value={newTransaction.type} onChange={(event) => setNewTransaction({ ...newTransaction, type: event.target.value })} className="rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </div>
+              <input value={newTransaction.category} onChange={(event) => setNewTransaction({ ...newTransaction, category: event.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Category" />
+              <div className="grid grid-cols-2 gap-3">
+                <input value={newTransaction.date} onChange={(event) => setNewTransaction({ ...newTransaction, date: event.target.value })} type="date" className="rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <select value={newTransaction.company_id} onChange={(event) => setNewTransaction({ ...newTransaction, company_id: event.target.value })} className="rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4">
+              <button onClick={() => setIsModalOpen(false)} className="rounded-lg px-4 py-2 font-medium text-slate-600 hover:bg-slate-200">Cancel</button>
+              <button onClick={handleCreate} disabled={!newTransaction.description.trim()} className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

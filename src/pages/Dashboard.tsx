@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   TrendingUp, 
@@ -9,6 +9,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { getCompanyPipelineValue, getCompanyProjectCount, getCompanyName, readFounderData } from '@/lib/localStore';
 
 interface DashboardData {
   companies: any[];
@@ -23,25 +24,32 @@ export default function Dashboard() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch('/api/dashboard')
-      .then(async res => {
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || `HTTP error ${res.status}`);
-        }
-        return res.json();
-      })
-      .then(data => {
-        setData(data);
-        setError(null);
-      })
-      .catch(err => {
-        console.error(err);
-        setError(err.message || 'Gagal memuat data dari server');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    try {
+      const storedData = readFounderData();
+      const companies = storedData.companies.map((company) => ({
+        ...company,
+        project_count: getCompanyProjectCount(storedData, company.id),
+        contact_count: storedData.contacts.filter((contact) => contact.company_id === company.id).length,
+        pipeline_value: getCompanyPipelineValue(storedData, company.id),
+      }));
+      const recentTasks = [...storedData.tasks]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5)
+        .map((task) => {
+          const project = storedData.projects.find((item) => item.id === task.project_id);
+          return {
+            ...task,
+            project_name: project?.name || getCompanyName(storedData, project?.company_id || ''),
+          };
+        });
+
+      setData({ companies, recentTasks });
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Gagal memuat data lokal');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   if (loading) return (
@@ -80,13 +88,13 @@ export default function Dashboard() {
   })) || [];
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl space-y-5 md:space-y-8">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="mobile-odd-span grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-6">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"
+          className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 md:p-6"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-emerald-100 rounded-lg">
@@ -96,8 +104,8 @@ export default function Dashboard() {
               <ArrowUpRight className="w-3 h-3" /> +12%
             </span>
           </div>
-          <h3 className="text-slate-500 text-sm font-medium">Total Pipeline Value</h3>
-          <p className="text-3xl font-bold text-slate-900 mt-1">
+          <h3 className="text-wrap-safe text-xs font-medium text-slate-500 md:text-sm">Total Pipeline Value</h3>
+          <p className="mt-1 text-xl font-bold text-slate-900 md:text-3xl">
             ${totalPipeline.toLocaleString()}
           </p>
         </motion.div>
@@ -106,36 +114,36 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"
+          className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 md:p-6"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-100 rounded-lg">
               <Briefcase className="w-6 h-6 text-blue-600" />
             </div>
           </div>
-          <h3 className="text-slate-500 text-sm font-medium">Active Projects</h3>
-          <p className="text-3xl font-bold text-slate-900 mt-1">{totalProjects}</p>
+          <h3 className="text-wrap-safe text-xs font-medium text-slate-500 md:text-sm">Active Projects</h3>
+          <p className="mt-1 text-xl font-bold text-slate-900 md:text-3xl">{totalProjects}</p>
         </motion.div>
 
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"
+          className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 md:p-6"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-purple-100 rounded-lg">
               <Building2 className="w-6 h-6 text-purple-600" />
             </div>
           </div>
-          <h3 className="text-slate-500 text-sm font-medium">Companies Managed</h3>
-          <p className="text-3xl font-bold text-slate-900 mt-1">{data?.companies.length}</p>
+          <h3 className="text-wrap-safe text-xs font-medium text-slate-500 md:text-sm">Companies Managed</h3>
+          <p className="mt-1 text-xl font-bold text-slate-900 md:text-3xl">{data?.companies.length}</p>
         </motion.div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 lg:gap-8">
         {/* Main Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div className="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-slate-100 md:p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-6">Pipeline by Company</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -154,7 +162,7 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Tasks */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 md:p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-6">Recent Tasks</h3>
           <div className="space-y-4">
             {data?.recentTasks.map((task, i) => (

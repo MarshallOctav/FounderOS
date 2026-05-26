@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: http://founderos.optibis.io/sitemap.xml
